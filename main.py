@@ -34,7 +34,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY environment variable not set")
 
-# Global HTTP client for reuse
 HTTP_CLIENT = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
 
 async def validate_url(url: str) -> bool:
@@ -71,7 +70,6 @@ async def evaluate_academic_quality(text: str) -> Dict:
 
     prompt = f"Evaluate this academic text. Return ONLY JSON with: 'score' (0-100), 'summary' (1 sentence), and 'quality' (poor/average/good/excellent).\n\nText: {text[:2500]}"
 
-    # FIXED: Using x-goog-api-key header instead of Bearer token
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": GEMINI_API_KEY
@@ -98,7 +96,6 @@ async def evaluate_academic_quality(text: str) -> Dict:
 
 async def search_duckduckgo(university: str, subject: str, semester: str) -> List[str]:
     try:
-        # Construct search query
         query = f"{subject} {semester} {university} filetype:pdf"
         url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         
@@ -110,7 +107,6 @@ async def search_duckduckgo(university: str, subject: str, semester: str) -> Lis
 
         for a in soup.find_all('a', href=True):
             href = a['href']
-            # DuckDuckGo obfuscates links. We must extract the real URL from the 'uddg' parameter.
             if 'uddg=' in href:
                 parsed_url = urllib.parse.urlparse(href)
                 query_params = urllib.parse.parse_qs(parsed_url.query)
@@ -118,11 +114,9 @@ async def search_duckduckgo(university: str, subject: str, semester: str) -> Lis
                 
                 if actual_url.lower().endswith('.pdf'):
                     pdf_links.append(actual_url)
-            # Sometimes direct links appear
             elif href.lower().endswith('.pdf'):
                 pdf_links.append(href)
 
-        # Return top 3 unique links
         return list(dict.fromkeys(pdf_links))[:3]
 
     except Exception as e:
@@ -155,7 +149,9 @@ async def process_pdf(request: PDFRequest):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "gemini_configured": bool()}@app.get("/debug-env")
+    return {"status": "healthy", "gemini_configured": bool(GEMINI_API_KEY)}
+
+# DEBUG ENDPOINT TO CHECK ENVIRONMENT VARIABLES
+@app.get("/debug-env")
 async def debug_env():
-    # This will show us the names of all variables Render is passing
     return {"available_keys": list(os.environ.keys())}
