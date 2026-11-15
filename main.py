@@ -1,7 +1,7 @@
 import os
 import re
 import httpx
-import fitz  # PyMuPDF
+import pymupdf  # Changed from fitz to pymupdf
 import tempfile
 import validators
 import json
@@ -47,11 +47,16 @@ async def extract_text_from_pdf(pdf_url: str, max_pages: int = 20) -> str:
         response = await HTTP_CLIENT.get(pdf_url)
         response.raise_for_status()
 
+        # CHECK: Ensure the downloaded file is actually a PDF
+        if not response.content.startswith(b'%PDF'):
+            print(f"ERROR: Downloaded content is not a PDF. Preview: {response.content[:100]}")
+            raise HTTPException(status_code=400, detail="The URL did not return a valid PDF file.")
+
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
             tmp.write(response.content)
             tmp_path = tmp.name
 
-        doc = fitz.open(tmp_path)
+        doc = pymupdf.open(tmp_path)  # Using pymupdf
         text = ""
         for page_num in range(min(max_pages, doc.page_count)):
             page = doc.load_page(page_num)
@@ -59,13 +64,16 @@ async def extract_text_from_pdf(pdf_url: str, max_pages: int = 20) -> str:
         doc.close()
         os.remove(tmp_path)
         
+        print(f"INFO: Successfully extracted {len(text)} characters from PDF.")
         return text
     except Exception as e:
+        print(f"PDF Extraction Error: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to process PDF: {str(e)}")
 
 async def evaluate_academic_quality(text: str) -> Dict:
     if not text or len(text) < 100:
-        return {"score": 0, "summary": "Document too short", "quality": "invalid"}
+        print(f"WARNING: Text too short ({len(text)} chars). Skipping Gemini evaluation.")
+        return {"score": 0, "summary": "Document too short or unreadable", "quality": "invalid"}
 
     prompt = f"Evaluate this academic text. Return ONLY JSON with: 'score' (0-100), 'summary' (1 sentence), and 'quality' (poor/average/good/excellent).\n\nText: {text[:2500]}"
 
@@ -90,8 +98,10 @@ async def evaluate_academic_quality(text: str) -> Dict:
         result = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
         return json.loads(result)
     except Exception as e:
-        print(f"Gemini API Error: {e}")
-        return {"score": 0, "summary": "Failed to evaluate", "quality": "unknown"}
+        print(f"Gemini API Exception: {e}")
+        if isinstance(e, httpx.HTTPStatusError):
+            print(f"Gemini API Response: {e.response.text}")
+        return {"score": 0, "summary": "Failed to evaluate with AI", "quality": "unknown"}
 
 async def search_duckduckgo(university: str, subject: str, semester: str) -> List[str]:
     try:
@@ -116,24 +126,20 @@ async def search_duckduckgo(university: str, subject: str, semester: str) -> Lis
             elif href.lower().endswith('.pdf'):
                 pdf_links.append(href)
 
-        # Return top 3 unique links
         unique_links = list(dict.fromkeys(pdf_links))[:3]
         
-        # FALLBACK: If DuckDuckGo blocks the server or returns nothing, use test PDFs
         if not unique_links:
-            print("No PDFs found via DDG. Using fallback PDFs for testing.")
+            print("No PDFs found via DDG. Using fallback PDFs.")
             unique_links = [
-                "https://pdfobject.com/pdf/sample.pdf",
-                "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+                "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                "https://pdfobject.com/pdf/sample.pdf"
             ]
             
         return unique_links
 
     except Exception as e:
         print(f"Search Error: {e}")
-        # Fallback on error as well
         return [
-            "https://pdfobject.com/pdf/sample.pdf",
             "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
         ]
 
@@ -167,6 +173,5 @@ async def health_check():
     return {
         "status": "healthy",
         "gemini_configured": bool(key),
-        "key_length": len(key),
-        "key_starts_with": key[:5] if key else "EMPTY"
+        "key_length": len(key)
     }
