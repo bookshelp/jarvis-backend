@@ -1,7 +1,7 @@
-import os
+﻿import os
 import re
 import httpx
-import pymupdf  # Using pymupdf directly
+import pymupdf
 import tempfile
 import validators
 import json
@@ -47,7 +47,6 @@ async def extract_text_from_pdf(pdf_url: str, max_pages: int = 20) -> str:
         response = await HTTP_CLIENT.get(pdf_url)
         response.raise_for_status()
 
-        # CHECK: Ensure the downloaded file is actually a PDF
         if not response.content.startswith(b'%PDF'):
             print(f"ERROR: Downloaded content is not a PDF. Preview: {response.content[:100]}")
             raise HTTPException(status_code=400, detail="The URL did not return a valid PDF file.")
@@ -126,10 +125,8 @@ async def search_duckduckgo(university: str, subject: str, semester: str) -> Lis
             elif href.lower().endswith('.pdf'):
                 pdf_links.append(href)
 
-        # Return top 3 unique links
         unique_links = list(dict.fromkeys(pdf_links))[:3]
         
-        # FALLBACK: If DuckDuckGo blocks the server or returns nothing, use test PDFs
         if not unique_links:
             print("No PDFs found via DDG. Using fallback PDFs.")
             unique_links = [
