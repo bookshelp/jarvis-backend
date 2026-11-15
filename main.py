@@ -1,7 +1,7 @@
 import os
 import re
 import httpx
-import pymupdf  # Changed from fitz to pymupdf
+import pymupdf  # Using pymupdf directly
 import tempfile
 import validators
 import json
@@ -56,7 +56,7 @@ async def extract_text_from_pdf(pdf_url: str, max_pages: int = 20) -> str:
             tmp.write(response.content)
             tmp_path = tmp.name
 
-        doc = pymupdf.open(tmp_path)  # Using pymupdf
+        doc = pymupdf.open(tmp_path)
         text = ""
         for page_num in range(min(max_pages, doc.page_count)):
             page = doc.load_page(page_num)
@@ -126,8 +126,10 @@ async def search_duckduckgo(university: str, subject: str, semester: str) -> Lis
             elif href.lower().endswith('.pdf'):
                 pdf_links.append(href)
 
+        # Return top 3 unique links
         unique_links = list(dict.fromkeys(pdf_links))[:3]
         
+        # FALLBACK: If DuckDuckGo blocks the server or returns nothing, use test PDFs
         if not unique_links:
             print("No PDFs found via DDG. Using fallback PDFs.")
             unique_links = [
@@ -140,7 +142,8 @@ async def search_duckduckgo(university: str, subject: str, semester: str) -> Lis
     except Exception as e:
         print(f"Search Error: {e}")
         return [
-            "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+            "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+            "https://pdfobject.com/pdf/sample.pdf"
         ]
 
 @app.post("/research")
