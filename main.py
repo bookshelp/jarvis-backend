@@ -151,7 +151,6 @@ async def process_pdf(request: PDFRequest):
 async def health_check():
     return {"status": "healthy", "gemini_configured": bool(GEMINI_API_KEY)}
 
-# DEBUG ENDPOINT TO CHECK ENVIRONMENT VARIABLES
 @app.get("/debug-env")
 async def debug_env():
     return {"available_keys": list(os.environ.keys())}
