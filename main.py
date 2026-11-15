@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import httpx
 import pymupdf
