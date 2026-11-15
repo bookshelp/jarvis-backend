@@ -155,4 +155,7 @@ async def process_pdf(request: PDFRequest):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "gemini_configured": bool()}
+    return {"status": "healthy", "gemini_configured": bool()}@app.get("/debug-env")
+async def debug_env():
+    # This will show us the names of all variables Render is passing
+    return {"available_keys": list(os.environ.keys())}
