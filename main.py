@@ -149,7 +149,13 @@ async def process_pdf(request: PDFRequest):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "gemini_configured": bool(GEMINI_API_KEY)}
+    key = os.getenv("GEMINI_API_KEY", "")
+    return {
+        "status": "healthy", 
+        "gemini_configured": bool(key),
+        "key_length": len(key),
+        "key_starts_with": key[:5] if key else "EMPTY"
+    }
 
 @app.get("/debug-env")
 async def debug_env():
